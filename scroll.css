@@ -1,0 +1,36 @@
+body{
+	margin:0;
+}
+
+section.sec0{
+	background-color:pink;
+}
+section.sec1{
+	background-color:#f2f2f2;
+}
+section.sec2{
+	background-color:#eee;
+}
+section.sec3{
+	background-color:#ddd;
+}
+section.sec4{
+	background-color:#ccc;
+	color:#fff;
+}
+section.sec5{
+	background-color:#000;
+	color:#fff;
+}
+section h1{
+	margin:0;
+}
+
+.floating{
+	position:fixed;
+	width:100px;
+	height:100px;
+	background:yellow;
+	right:10px;
+	cursor:move;
+}
