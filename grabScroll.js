@@ -12,7 +12,7 @@
 		defaults = {
 			time: 5000,
 			distance: null,
-			graber: null,
+			grabber: '.floating',
 			section: 'section',
 			sectionHeight: 'full',
 			snapping: true,
@@ -21,14 +21,21 @@
 			snapStickyInterval: 10, // stick immediately
 			onScroll: function(){},
 			onSnapComplete: function(){},
-			onWindowEnter: function(){}
+			onWindowEnter: function(){},
+			onTarget: function(){},
+			onCurrent: function(){}
 		},
 		$w = $(window),
+		wh =  $w.height(),
 		animated = false, // animated
+		$drag =  null,
+		cursor = {dragged : false, free: false},
 		s = 0, // scroll amount
 		t = null, // timeout
-		$sections = [];
-		offset = [];
+		$sections = [],
+		offset = [],
+		current = 0,
+		target = 0;
 
 	// The actual plugin constructor
 	var GrabScroll = function( element, options ) {
@@ -39,7 +46,9 @@
 
 		this._defaults = defaults;
 		this._name = pluginName;
+		$drag = $(this.options.grabber)
 
+		console.log('global var g',window.g = this)
 		this.init();
 	}
 
@@ -47,10 +56,7 @@
 		init: function() {
 			this._setSectionHeight();
 			this._setOffset();
-			
-			s = 4;
-			console.log(this.options)
-			
+
 			/*
 			 as I am listening the $w(indow) element, 
 			 i will loose context while calling this._onScroll
@@ -60,11 +66,52 @@
 			var that = this;
 			$w.on('scroll', this._onScroll.bind(that) );
 			$w.on('resize', this._onResize.bind(that) );
-			
+			cursor.free = true;
+
+			//// debug
+			$($drag).on('mousedown', function (e) {
+				if(!animated){ // prevent grabbing during animation
+					cursor.free = false;
+					cursor.dragged = true; // we will be listening to mouse events
+					$drag = $(e.target).addClass('active');
+					console.log('grabbed');
+				}
+				else console.log('already animated') // debug
+			}).on("mousemove", function(e) {
+				if (cursor.dragged) {
+					y = e.clientY;
+					that._dragMove(y);
+			    }
+			});
+
+			$(document).on("mouseup", function (e) {
+				if(cursor.dragged == true){
+					// dragged = false; // i wll cheat here
+					console.log('released');
+					console.log('let\'s go to ',target)
+					
+					that._animateTo(target, function(){
+						console.log('callback from mouseup')
+//this should undrag the cursor
+// but pergaps after animating it
+						cursor.dragged = false;
+						that._setCursorFree();
+					})
+					
+	/*				$("html, body").animate(
+						{ scrollTop: $('#s'+targetSection).offset().top },
+						1000
+					);
+	*/
+					
+				}
+	
+			});
+
 		},
 		_setSectionHeight: function(){
 			if(this.options.sectionHeight == 'full')
-				this.options.sectionHeight = $(window).height();
+				this.options.sectionHeight = wh = $(window).height();
 			$sections =
 				$(this.options.section).css({'height':this.options.sectionHeight});
 		},
@@ -79,8 +126,12 @@
 		 */
 		_onScroll : function(){
 			s = $w.scrollTop();
+
+			this._setCursorPos();
+
 			this._onScrollEnd();
 //			_snapWindow();
+
 
 			this.options.onScroll({s:s,sections:$sections});
 			
@@ -125,8 +176,10 @@
 				that = this;
 			$.each($sections, function(i){
 				
-				if(s == offset[i].top)
+				if(s == offset[i].top){
+					that._setCurrent(i);
 					return;
+				}
 
 				// if I am really close, stick immediately
 				if(
@@ -134,7 +187,9 @@
 					&& !animated // there is no animation running
 				){ 
 					$("html, body").scrollTop(offset[i].top);
+					
 					console.log('I immediately sticked !, not animated (',animated,')');
+					current = i;
 					return;
 				}
 
@@ -144,7 +199,9 @@
 					// cache this section
 					var currentSection = this;
 					console.log('I should animate',options.snapSpeed)
-					that._animateTo(i,currentSection,options)
+					that._animateTo(i,function(){
+						console.log('callback works from snap')
+					})
 					/*$('html:not(:animated),body:not(:animated)')
 						.animate(
 							{scrollTop: 0}, 
@@ -178,7 +235,10 @@
 			} // options.snapping
 */
 		},
-		_animateTo: function(j,el,options){
+		_animateTo: function(j, callback = function(){}){
+			var options = this.options,
+				el = $sections[j];
+			
 			if(!animated){
 				animated = true;
 				$('html:not(:animated),body:not(:animated)')
@@ -191,6 +251,8 @@
 							t = null;
 							animated = false;
 							options.onSnapComplete(el);
+							
+							callback();
 						}
 				);
 			}
@@ -201,6 +263,66 @@
 			console.log($(window).height(),offset);
 			
 			// snap ?
+		},
+		_getCursorPos: function(){
+			var scrolled = $(window).scrollTop(),
+				total = $(document).height(),
+				wh = $(window).height();
+
+			return Math.min(Math.floor(scrolled/total*wh),wh-100);
+		},
+		_setCursorPos: function(){
+			if(!animated || !cursor.dragged){ //|| !cursor.free
+				$($drag).css({'top': this._getCursorPos(),'position':'fixed'})
+			}
+
+		},
+		_setCursorFree: function(){
+			$drag.removeClass('active').css({'position':'fixed'});
+			cursor.draggable = true;
+		},
+		_cursorAnimate: function(){
+			if(!animated){
+				animated = true;
+				$drag.animate({'top': this._getCursorPos()},1000,'linear',function(){
+					
+				})
+			}
+			else console.log('can\'t place cursor while animated');
+		},
+		_dragGrab: function(){
+			
+		},
+		_dragDrop: function(){
+			
+		},
+		_dragMove: function(y){
+			var numberOfSections = offset.length,
+				posy = Math.max(0,Math.min(y-50,wh-(2*50))),
+				ctarget = Math.round(y/wh*numberOfSections)
+			if(ctarget != target){
+				this._setTarget(ctarget);
+			}
+
+			$('.floating').html(
+				'y' + y + '/' + wh + '<br>'
+				+ 'go to ' + ctarget + '/' + numberOfSections +'<br>'
+			);	
+
+			
+			$drag.css({
+				top: posy
+			});	
+		},
+		_setCurrent: function(i){
+			current = Math.min(i,offset.length-1);
+			this.options.onCurrent(i);
+			console.log('current',i)
+		},
+		_setTarget: function(i){
+			target = Math.min(i,offset.length-1);
+			this.options.onTarget(i);
+			console.log('target',i);
 		}
 
 	};
