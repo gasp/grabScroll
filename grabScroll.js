@@ -235,7 +235,7 @@
 			} // options.snapping
 */
 		},
-		_animateTo: function(j, callback = function(){}){
+		_animateTo: function(j, callback){
 			var options = this.options,
 				el = $sections[j];
 			
