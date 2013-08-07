@@ -111,9 +111,10 @@
 		},
 		_setSectionHeight: function(){
 			if(this.options.sectionHeight == 'full')
-				this.options.sectionHeight = wh = $(window).height();
+				this.options.sectionMinHeightValue = wh = $(window).height();
+			else this.options.sectionMinHeightValue = this.options.sectionHeight;
 			$sections =
-				$(this.options.section).css({'height':this.options.sectionHeight});
+				$(this.options.section).css({'min-height':this.options.sectionMinHeightValue});
 		},
 		_setOffset: function(){
 			$.each($sections, function(i){
